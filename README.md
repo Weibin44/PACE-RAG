@@ -1,9 +1,183 @@
-# PACE-RAG (Less can be More)
+# PACE-RAG: Less can be More
 
-PACE (Prioritized Adaptive Coverage of Evidence): Pressure-adaptive & evidence frontloading for retrieval-augmented generation (RAG).
+**PACE** (*Prioritized Adaptive Coverage of Evidence*) improves RAG efficiency and effectiveness by combining **evidence frontloading** with **pressure-adaptive evidence stopping**.
+
+## Contents
+
+- [PACE-RAG: Less can be More](#pace-rag-less-can-be-more)
+  - [Contents](#contents)
+  - [The problem](#the-problem)
+  - [Core ideas](#core-ideas)
+  - [Results](#results)
+    - [🔴 1. Evidence Frontloading](#-1-evidence-frontloading)
+    - [🔵 2. Pressure-Adaptive Evidence Stopping](#-2-pressure-adaptive-evidence-stopping)
+    - [🟠 3. Less can be More](#-3-less-can-be-more)
+  - [Quick Run](#quick-run)
+    - [Evidence frontloading only](#evidence-frontloading-only)
+    - [Full experiments](#full-experiments)
+  - [Full Reproduction Guide](#full-reproduction-guide)
+    - [Installation](#installation)
+    - [Data Layout](#data-layout)
+      - [Building the BERGEN corpus and SPLADE index](#building-the-bergen-corpus-and-splade-index)
+    - [Reproduction Workflow](#reproduction-workflow)
+      - [Preprocessing](#preprocessing)
+        - [External prerequisites](#external-prerequisites)
+        - [HotpotQA](#hotpotqa)
+        - [2WikiMultiHopQA](#2wikimultihopqa)
+        - [MuSiQue](#musique)
+      - [Effectiveness experiments](#effectiveness-experiments)
+      - [Online serving simulation](#online-serving-simulation)
+    - [Environment variables](#environment-variables)
+
+## The problem
+
+RAG systems often retrieve many documents and then rerank them before generation. Under high request rates, or large reranking budgets, scoring all candidates can make the **reranker the system bottleneck**, increasing queueing delay and end-to-end latency. Simply reranking fewer documents is faster, but may discard supporting evidence.
 
 
-## Installation
+
+> **Goal:** reduce reranking work while preserving useful evidence.
+
+## Core ideas
+
+<p align="center">
+  <a href="docs/intro_figure_v2.pdf">
+    <img src="docs/intro_figure_v2.png" alt="PACE-RAG overview" width="720">
+  </a>
+</p>
+
+1. **Evidence frontloading.** PACE moves useful documents earlier in the ranking prefix, enabling high recall with a smaller reranking budget.
+2. **Pressure-adaptive evidence stopping.** PACE compares reranker and LLM queue pressure, then dynamically adjusts how many documents are sent to the reranker.
+3. **Less can be more.** By combing evidence frontload with adaptive stopping, PACE can rerank **fewer** documents while achieving **lower** latency and **higher** final recall.
+
+
+
+## Results
+
+### 🔴 1. Evidence Frontloading
+
+> **Result summary:** higher recall at fixed $D$.
+
+<p align="center">
+  <a href="docs/complete_evidence_recall_vs_d.pdf">
+    <img src="docs/complete_evidence_recall_vs_d.png" alt="Complete evidence recall versus reranking budget" width="100%">
+  </a>
+</p>
+
+### 🔵 2. Pressure-Adaptive Evidence Stopping
+
+> **Result summary:** lower reranker pressure and lower latency.
+
+<p align="center">
+  <a href="docs/hotpot_online_latency_p95.pdf">
+    <img src="docs/hotpot_online_latency_p95.png" alt="P95 online serving latency and queue time" width="100%">
+  </a>
+</p>
+
+### 🟠 3. Less can be More
+
+> **Key observation:** **fewer reranked documents can lead to both lower latency and higher Recall@K ($K=5$).**
+
+<p align="center">
+  <a href="docs/less_more.pdf">
+    <img src="docs/less_more.png" alt="Less can be more results" width="560">
+  </a>
+</p>
+
+---
+
+## Quick Run
+
+### Evidence frontloading only
+
+Evidence frontloading can be used independently of the serving system, datasets, and caches. Given `N` candidate documents represented in the same dimension of `d`, call:
+
+```bash
+python -m pip install -e .
+```
+
+```python
+import numpy as np
+
+from pace.methods import frontload_evidence
+
+documents = ["document A", "document B", "document C"]
+
+order = frontload_evidence(
+    query_features=np.array([1.0, 1.0]),                # [d]
+    document_features=np.array([                       # [N, d]
+        [1.0, 0.0],
+        [0.0, 1.0],
+        [1.0, 1.0],
+    ]),
+    query_relevance=np.array([0.9, 0.8, 0.2]),         # [N]
+    document_similarity=np.array([                     # [N, N]
+        [1.0, 0.1, 0.3],
+        [0.1, 1.0, 0.4],
+        [0.3, 0.4, 1.0],
+    ]),
+    budget=2,
+)
+
+selected_documents = [documents[index] for index in order]
+print(order)               # [2, 0]
+print(selected_documents)  # ['document C', 'document A']
+```
+
+| Input                 | Shape    | Meaning                                 |
+| :-------------------- | :------- | :-------------------------------------- |
+| `query_features`      | `[d]`    | Query features, such as SPLADE features |
+| `document_features`   | `[N, d]` | Candidate features in the same space    |
+| `query_relevance`     | `[N]`    | Retriever or reranker relevance scores  |
+| `document_similarity` | `[N, N]` | Pairwise candidate similarities         |
+| `budget`              | scalar   | Number of documents to return           |
+
+The output is a list of `budget` distinct indices into the original candidate list, ordered by evidence-frontloading priority.
+
+### Full experiments
+
+1. Install PACE-RAG and its dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+2. Download and extract the prepared-data package (**download link: data will be provided later**) next to the repository:
+
+```text
+workspace/
+├── PACE-RAG/
+└── data/
+```
+
+The scripts use `../data` by default. For a different location, set `PACE_DATA_ROOT=/absolute/path/to/data`.
+
+3. Reproduce the effectiveness results without regenerating caches:
+
+```bash
+# Figure 3,4,5
+PREPARE_CACHE=0 bash scripts/run_hotpot.sh
+PREPARE_CACHE=0 bash scripts/run_2wiki.sh
+PREPARE_CACHE=0 bash scripts/run_musique.sh
+# Table 2
+bash scripts/run_joint_d_to_k.sh
+MPLCONFIGDIR=/tmp/pace-matplotlib python -m pace.evaluation.plot_effectiveness \
+    --input-root outputs/effectiveness \
+    --output-root outputs/effectiveness
+```
+
+To reproduce the HotpotQA online-serving results after the HotpotQA effectiveness run, use three CUDA-capable GPUs:
+
+```bash
+# Figure 6,7,8
+bash scripts/run_online_hotpot.sh
+bash scripts/plot_online_hotpot.sh
+```
+
+---
+
+## Full Reproduction Guide
+
+### Installation
 
 PACE-RAG requires Python 3.10 or newer. Install the project with model and cohort-reconstruction dependencies:
 
@@ -19,7 +193,7 @@ python -m pip install -e ".[models,cohort,test]"
 
 Online serving simulation requires three CUDA-capable GPUs. Effectiveness evaluation can use either CUDA or CPU. 
 
-## Data layout
+### Data Layout
 
 Large datasets, generated cohorts, and model caches are stored outside this repository. Their root directory is configured using `PACE_DATA_ROOT`.
 
@@ -52,9 +226,6 @@ data/
         ├── reranker_scores.npy
         └── splade_similarity/
 ```
-
-Do not include historical cache directories such as `document_similarity/` or directories whose names begin with `[old]` in the prepared-data package.
-
 The following smaller inputs are additionally required only when rebuilding the prepared cohorts from retrieval results:
 
 ```text
@@ -84,7 +255,7 @@ BERGEN_INDEX_DIR/
 
 `BERGEN_CORPUS_DIR` contains the BERGEN-segmented Wikipedia passages, while `BERGEN_INDEX_DIR` contains the corresponding SPLADE-v3 passage embeddings in exactly the same corpus order.
 
-### Building the BERGEN corpus and SPLADE index
+#### Building the BERGEN corpus and SPLADE index
 
 These two artifacts were generated by [BERGEN](https://github.com/naver/bergen), rather than by this repository. Install BERGEN following its official instructions, then run the following command from the BERGEN repository root:
 
@@ -109,13 +280,14 @@ indexes/odqa-wiki-corpora-all-63-tamber_doc_naver_splade-v3/
 Set `BERGEN_CORPUS_DIR` and `BERGEN_INDEX_DIR` to these two directories. Do not reorder corpus rows or embedding chunks: retrieval assumes that every embedding row has the same global index as its corresponding corpus passage. In our environment, the processed corpus and index occupy approximately 44 GB and 218 GB, respectively.
 
 
-## Reproduction Workflow
+### Reproduction Workflow
 
-There are two supported starting points: using prepared cohorts and caches is the recommended path for reproducing the paper results, while the complete path rebuilds them from the original datasets and the preprocessed BERGEN Wikipedia corpus and SPLADE index.
+There are two supported starting points. The recommended path uses prepared cohorts and caches to reproduce the paper results. The complete path rebuilds them from the original datasets, the preprocessed BERGEN Wikipedia corpus, and the SPLADE index.
 
-The official QA datasets, BERGEN corpus segmentation, corpus embeddings, pretrained retrieval model, reranker, and compressor ([Provence](https://huggingface.co/naver/provence-reranker-debertav3-v1)) are external resources. This project performs retrieval, evidence alignment, cohort filtering, calibration splitting (e.g., prepare 100 queries for finding hyperparameters for baselines, and exclude them from evaluation), and cache generation.
 
-### Preprocessing
+The official QA datasets, BERGEN corpus segmentation, corpus embeddings, pretrained retrieval model, reranker, and compressor ([Provence](https://huggingface.co/naver/provence-reranker-debertav3-v1)) are external resources. This project performs retrieval, evidence alignment, cohort filtering, calibration splitting, and cache generation.
+
+#### Preprocessing
 
 The preprocessing pipeline has six steps:
 
@@ -126,7 +298,7 @@ The preprocessing pipeline has six steps:
 5. **Split calibration from evaluation.** Select 100 query IDs deterministically using SHA-256 ordering, use them only to calibrate baseline hyperparameters, and exclude them from all reported metrics. The remaining queries form the evaluation set.
 6. **Generate reusable caches.** Precompute reranker scores, SPLADE coverage features, and query-document/document-document similarities used by the effectiveness and online-serving experiments.
 
-#### External prerequisites
+##### External prerequisites
 
 The complete preprocessing pipeline requires the official dev splits of HotpotQA, 2WikiMultiHopQA, and MuSiQue-Ans, together with the BERGEN Wikipedia corpus and its corresponding SPLADE index.
 
@@ -136,7 +308,7 @@ export BERGEN_CORPUS_DIR=/path/to/bergen_corpus
 export BERGEN_INDEX_DIR=/path/to/bergen_splade_index
 ```
 
-#### HotpotQA
+##### HotpotQA
 
 The HotpotQA preprocessing flow is:
 
@@ -191,7 +363,7 @@ scripts/prepare_cache.sh \
     cuda
 ```
 
-#### 2WikiMultiHopQA
+##### 2WikiMultiHopQA
 
 The 2WikiMultiHopQA preprocessing flow is:
 
@@ -255,7 +427,7 @@ scripts/prepare_cache.sh \
     cuda
 ```
 
-#### MuSiQue
+##### MuSiQue
 
 MuSiQue uses the official answerable dev split and its provided closed-context candidate paragraphs, so it does not use the BERGEN corpus, external retrieval, or additional passage segmentation.
 
@@ -277,7 +449,7 @@ scripts/prepare_cache.sh \
 
 The deterministic 100-query calibration split is selected when the effectiveness evaluation is first run, and calibration queries are excluded from the reported evaluation results.
 
-### Effectiveness experiments
+#### Effectiveness experiments
 
 With the prepared data package, run the three datasets without regenerating caches:
 
@@ -300,7 +472,7 @@ MPLCONFIGDIR=/tmp/pace-matplotlib python -m pace.evaluation.plot_effectiveness \
 
 The main outputs are `joint_d_to_k/joint_recall.csv`, the two PDFs under `cross_dataset_D/`, and `cross_dataset_ablation/complete_evidence_recall_ablation.pdf`. All experiments use fixed batch sizes of 8 reranker pairs, 10 LLM requests, and 4 Provence inputs.
 
-### Online serving simulation
+#### Online serving simulation
 
 The HotpotQA online experiment uses the fixed 1,087-query evaluation cohort and requires three GPUs: one each for the reranker, LLM, and Provence compressor.
 
@@ -310,7 +482,7 @@ bash scripts/run_online_hotpot.sh
 
 The experiment evaluates nine methods at QPS values from 0.5 to 1.8, with a 60-second warm-up, adaptive \(D \in [20,100]\), \(K=5\), and at most 128 generated tokens. Raw request traces, summaries, and the run manifest are written to `${PACE_ONLINE_OUTPUT_ROOT}/hotpot`. Completed method-QPS combinations are skipped when the command is resumed.
 
-Generate the Figures 6,7,8 after the serving run completes:
+Generate the Figures 6,7, and 8 after the serving run completes:
 
 ```bash
 bash scripts/plot_online_hotpot.sh
@@ -318,7 +490,7 @@ bash scripts/plot_online_hotpot.sh
 
 The PDFs are written to `${PACE_ONLINE_OUTPUT_ROOT}/hotpot/paper_plots`.
 
-## Environment variables
+### Environment variables
 
 Copy the example configuration:
 

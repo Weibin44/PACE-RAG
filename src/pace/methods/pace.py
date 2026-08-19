@@ -77,3 +77,71 @@ def soft_anchor(
     )
     combined = 1.0 - (1.0 - base) * (1.0 - anchor)
     return combined.astype(np.float32), weights, effective_anchors
+
+
+
+def frontload_evidence(
+    query_features: np.ndarray,
+    document_features: np.ndarray,
+    query_relevance: np.ndarray,
+    document_similarity: np.ndarray,
+    budget: int,
+) -> list[int]:
+    """Return evidence-frontloaded document indices.
+
+    Shapes:
+        query_features: [features]
+        document_features: [documents, features]
+        query_relevance: [documents]
+        document_similarity: [documents, documents]
+    """
+    query_features = np.asarray(query_features, dtype=np.float32)
+    document_features = np.asarray(document_features, dtype=np.float32)
+    query_relevance = np.asarray(query_relevance, dtype=np.float32)
+    document_similarity = np.asarray(document_similarity, dtype=np.float32)
+
+    if query_features.ndim != 1:
+        raise ValueError("query_features must have shape [features]")
+
+    if document_features.ndim != 2:
+        raise ValueError(
+            "document_features must have shape [documents, features]"
+        )
+
+    document_count = document_features.shape[0]
+
+    if document_features.shape[1] != query_features.size:
+        raise ValueError(
+            "query and document feature dimensions must match"
+        )
+
+    if query_relevance.shape != (document_count,):
+        raise ValueError(
+            "query_relevance must have shape [documents]"
+        )
+
+    if document_similarity.shape != (
+        document_count,
+        document_count,
+    ):
+        raise ValueError(
+            "document_similarity must have shape "
+            "[documents, documents]"
+        )
+
+    if not 1 <= budget <= document_count:
+        raise ValueError(
+            "budget must be between 1 and the document count"
+        )
+
+    relevance, _, _ = soft_anchor(
+        query_relevance,
+        document_similarity,
+    )
+
+    return greedy_evidence_frontloading_order(
+        query_features,
+        document_features,
+        relevance,
+        limit=budget,
+    )

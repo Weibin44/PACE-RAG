@@ -1,5 +1,6 @@
 import numpy as np
 
+from pace.methods import frontload_evidence
 from pace.methods.pace import (
     greedy_evidence_frontloading_order,
     soft_anchor,
@@ -59,3 +60,29 @@ def test_greedy_evidence_frontloading_order():
     )
 
     assert order == [0, 1]
+
+
+def test_frontload_evidence_readme_example():
+    order = frontload_evidence(
+        query_features=np.array([1.0, 1.0]),
+        document_features=np.array(
+            [
+                [1.0, 0.0],
+                [0.0, 1.0],
+                [1.0, 1.0],
+            ]
+        ),
+        query_relevance=np.array([0.9, 0.8, 0.2]),
+        document_similarity=np.array(
+            [
+                [1.0, 0.1, 0.3],
+                [0.1, 1.0, 0.4],
+                [0.3, 0.4, 1.0],
+            ]
+        ),
+        budget=2,
+    )
+
+    assert order == [2, 0]
+    assert len(order) == 2
+    assert len(set(order)) == len(order)
