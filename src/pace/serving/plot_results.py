@@ -19,7 +19,7 @@ METHODS = (
     ("queue_adaptive_coverage_only_d", "w/o query & anchor relevance", "#59A14F", 1.9),
     ("queue_adaptive_sqrt", "w/o anchor relevance", "#F2CF5B", 1.9),
     ("queue_adaptive_anchor_only", "w/o query relevance", "#A65628", 1.9),
-    ("queue_adaptive_soft_anchor", "Ours", "#D62728", 1.9),
+    ("queue_adaptive_soft_anchor", "Ours (PACE)", "#D62728", 1.9),
 )
 RECALL_MARKERS = {
     "fixed_d100": None,
@@ -32,6 +32,16 @@ RECALL_MARKERS = {
     "queue_adaptive_anchor_only": "D",
     "queue_adaptive_soft_anchor": "o",
 }
+
+
+def marker_positions(point_count: int) -> list[int]:
+    """Return four approximately equally spaced marker positions."""
+    if point_count <= 4:
+        return list(range(point_count))
+    return [
+        index * point_count // 5
+        for index in range(1, 5)
+    ]
 
 
 def rows_for(rows: list[dict], method: str) -> list[dict]:
@@ -50,7 +60,7 @@ def plot_metric(axis, rows, field: str, methods=METHODS, show_markers=False) -> 
                 [float(row[field]) for row in points],
                 color=color, linewidth=linewidth, linestyle="-", label=label,
                 marker=RECALL_MARKERS[method] if show_markers else None,
-                markersize=4.2, markevery=2,
+                markersize=4.2, markevery=marker_positions(len(points)),
             )
     axis.set_xlabel("QPS")
     axis.grid(alpha=0.22, which="both")

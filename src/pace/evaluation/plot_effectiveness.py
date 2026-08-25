@@ -16,11 +16,11 @@ DATASETS = (
 )
 
 COMPARISON_METHODS = (
-    ("standard", "#000000", "Standard dense", 2.4),
-    ("rocchio_prf", "#0072B2", "Rocchio PRF", 1.9),
-    ("mmr", "#009E73", "MMR", 1.9),
-    ("dartboard", "#E69F00", "Dartboard", 2.2),
-    ("ours", "#D62728", "Ours", 3.2),
+    ("standard", "#000000", "Standard dense", "-", "s", 2.4),
+    ("rocchio_prf", "#0072B2", "Rocchio PRF", "--", "v", 1.9),
+    ("mmr", "#009E73", "MMR", "-.", "<", 1.9),
+    ("dartboard", "#E69F00", "Dartboard", ":", ">", 2.2),
+    ("ours", "#D62728", "Ours (PACE)", "-", "o", 3.2),
 )
 
 ABLATION_METHODS = (
@@ -29,6 +29,7 @@ ABLATION_METHODS = (
         "w/o query & anchor relevance",
         "#7F7F7F",
         ":",
+        "P",
         2.4,
     ),
     (
@@ -36,6 +37,7 @@ ABLATION_METHODS = (
         "w/o anchor relevance",
         "#E69F00",
         "--",
+        "^",
         2.1,
     ),
     (
@@ -43,13 +45,15 @@ ABLATION_METHODS = (
         "w/o query relevance",
         "#A65628",
         "-.",
+        "D",
         2.1,
     ),
     (
         "ours",
-        "Ours",
+        "Ours (PACE)",
         "#D62728",
         "-",
+        "o",
         3.2,
     ),
 )
@@ -85,6 +89,16 @@ def d_rows(
         for row in curves
         if row["stage"] == "D"
         and row["method"] == method
+    ]
+
+
+def marker_positions(point_count: int) -> list[int]:
+    """Return four approximately equally spaced marker positions."""
+    if point_count <= 4:
+        return list(range(point_count))
+    return [
+        index * point_count // 5
+        for index in range(1, 5)
     ]
 
 
@@ -130,6 +144,8 @@ def plot_comparison(
                 method,
                 color,
                 method_label,
+                linestyle,
+                marker,
                 linewidth,
             ) in COMPARISON_METHODS:
                 rows = d_rows(curves, method)
@@ -144,7 +160,12 @@ def plot_comparison(
                     ],
                     color=color,
                     linewidth=linewidth,
-                    linestyle="-",
+                    linestyle=linestyle,
+                    marker=marker,
+                    markevery=marker_positions(len(rows)),
+                    markersize=5.2,
+                    markerfacecolor="white",
+                    markeredgewidth=1.0,
                     label=method_label,
                 )
 
@@ -212,6 +233,7 @@ def plot_ablation(
             method_label,
             color,
             linestyle,
+            marker,
             linewidth,
         ) in ABLATION_METHODS:
             rows = d_rows(curves, method)
@@ -231,6 +253,11 @@ def plot_ablation(
                 label=method_label,
                 color=color,
                 linestyle=linestyle,
+                marker=marker,
+                markevery=marker_positions(len(rows)),
+                markersize=5.2,
+                markerfacecolor="white",
+                markeredgewidth=1.0,
                 linewidth=linewidth,
             )
 

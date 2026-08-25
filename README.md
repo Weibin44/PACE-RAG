@@ -1,6 +1,6 @@
 # PACE-RAG: Less can be More
 
-**PACE** (*Prioritized Adaptive Coverage of Evidence*) improves RAG efficiency and effectiveness by combining **evidence frontloading** with **pressure-adaptive evidence stopping**.
+**PACE** (*Prioritized Adaptive Coverage of Evidence*) improves RAG efficiency and effectiveness by combining **evidence frontloading** with **pressure-adaptive evidence budgeting**.
 
 ## Contents
 
@@ -10,7 +10,7 @@
   - [Core ideas](#core-ideas)
   - [Results](#results)
     - [🔴 1. Evidence Frontloading](#-1-evidence-frontloading)
-    - [🔵 2. Pressure-Adaptive Evidence Stopping](#-2-pressure-adaptive-evidence-stopping)
+    - [🔵 2. Pressure-Adaptive Evidence Budgeting](#-2-pressure-adaptive-evidence-budgeting)
     - [🟠 3. Less can be More](#-3-less-can-be-more)
   - [Quick Run](#quick-run)
     - [Evidence frontloading only](#evidence-frontloading-only)
@@ -40,14 +40,14 @@ RAG systems often retrieve many documents and then rerank them before generation
 ## Core ideas
 
 <p align="center">
-  <a href="docs/intro_figure_v2.pdf">
-    <img src="docs/intro_figure_v2.png" alt="PACE-RAG overview" width="720">
+  <a href="docs/intro_figure_v3.pdf">
+    <img src="docs/intro_figure_v3.png" alt="PACE-RAG overview" width="720">
   </a>
 </p>
 
 1. **Evidence frontloading.** PACE moves useful documents earlier in the ranking prefix, enabling high recall with a smaller reranking budget.
-2. **Pressure-adaptive evidence stopping.** PACE compares reranker and LLM queue pressure, then dynamically adjusts how many documents are sent to the reranker.
-3. **Less can be more.** By combing evidence frontload with adaptive stopping, PACE can rerank **fewer** documents while achieving **lower** latency and **higher** final recall.
+2. **Pressure-adaptive evidence budgeting.** PACE compares reranker and LLM queue pressure, then dynamically adjusts how many documents are sent to the reranker.
+3. **Less can be more.** By combining evidence frontloading with adaptive budgeting, PACE can rerank **fewer** documents while achieving **lower** latency and **higher** final recall.
 
 
 
@@ -63,7 +63,7 @@ RAG systems often retrieve many documents and then rerank them before generation
   </a>
 </p>
 
-### 🔵 2. Pressure-Adaptive Evidence Stopping
+### 🔵 2. Pressure-Adaptive Evidence Budgeting
 
 > **Result summary:** lower reranker pressure and lower latency.
 
