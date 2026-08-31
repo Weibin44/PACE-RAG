@@ -1,5 +1,7 @@
 # PACE-RAG: Less can be More
 
+> Official implementation of the arXiv preprint [*Less can be More: Relieving RAG Bottlenecks via Evidence Frontloading and Pressure-Adaptive Budgeting*](https://arxiv.org/abs/2608.25115).
+
 **PACE** (*Prioritized Adaptive Coverage of Evidence*) improves RAG efficiency and effectiveness by combining **evidence frontloading** with **pressure-adaptive evidence budgeting**.
 
 ## Contents
@@ -28,6 +30,7 @@
       - [Effectiveness experiments](#effectiveness-experiments)
       - [Online serving simulation](#online-serving-simulation)
     - [Environment variables](#environment-variables)
+  - [Citation](#citation)
 
 ## The problem
 
@@ -509,3 +512,16 @@ set +a
 If unset, `PACE_DATA_ROOT` defaults to `../data`, `PACE_OUTPUT_ROOT` to `outputs/effectiveness`, and `PACE_ONLINE_OUTPUT_ROOT` to `outputs/online`, all relative to this repository.
 
 Generated experiment results are written to `outputs/` and are not tracked by Git.
+
+## Citation
+
+If you find this helpful, please cite the paper:
+
+```bibtex
+@article{cai2026less,
+  title={Less can be More: Relieving RAG Bottlenecks via Evidence Frontloading and Pressure-Adaptive Budgeting},
+  author={Cai, Weibin and Zafarani, Reza},
+  journal={arXiv preprint arXiv:2608.25115},
+  year={2026}
+}
+```
